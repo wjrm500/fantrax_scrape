@@ -1,33 +1,28 @@
+from typing import List
+from urllib.request import ProxyDigestAuthHandler
+from bs4 import BeautifulSoup
 import requests
+import string
 
-payload = {
-  "msgs": [
-    {
-      "method": "getPlayerProfile",
-      "data": {
-        "playerId": "02ln1",
-        "tab": "GAME_LOG_FANTASY"
-      }
-    }
-  ],
-  "ng2": True,
-  "refUrl": "https://www.fantrax.com/player/02ln1/vq6dn98pkrutq54c/david-de-gea/o5068s8hkrutq54h",
-  "dt": 0,
-  "at": 0,
-  "av": None,
-  "tz": "Asia/Singapore",
-  "v": "70.0.0"
-}
+players_template = string.Template('https://www.fantrax.com/newui/EPL/players.go?ltr=${letter}')
+player_template = string.Template('https://www.fantrax.com/player/${player_id}/vq6dn98pkrutq54c/${player_name}/o5068s8hkrutq54h')
 
-headers = {
-    "accept": "application/json",
-    "content-type": "text/plain",
-    "referer": "https://www.fantrax.com/player/02ln1/vq6dn98pkrutq54c/david-de-gea/o5068s8hkrutq54h",
-    "sec-ch-ua": '" Not A;Brand";v="99", "Chromium";v="99", "Google Chrome";v="99"',
-    "sec-ch-ua-mobile": "?1",
-    "sec-ch-ua-platform": "Android",
-    "User-Agent": "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Mobile Safari/537.36"
-}
+def get_player_urls(num_letters: int = None) -> List:
+    player_urls = []
+    max_letter_index = num_letters or -1
+    for letter in string.ascii_uppercase[:max_letter_index]:
+        r = requests.get(players_template.safe_substitute(letter = letter))
+        soup = BeautifulSoup(r.text)
+        table = soup.find('table', class_='sportsTable')
+        for row in table.find_all('tr')[1:]:
+            td = row.find('td')
+            onclick_attr = td.find('a').attrs['onclick']
+            substring_start_loc = onclick_attr.find('\'') + 1
+            substring_end_loc = substring_start_loc + onclick_attr[substring_start_loc:].find('\'')
+            player_id = onclick_attr[substring_start_loc:substring_end_loc]
+            player_name = td.text.lower().replace(' ', '-')
+            player_url = player_template.safe_substitute(player_id = player_id, player_name = player_name)
+            player_urls.append(player_url)
+    return player_urls
 
-r = requests.post('https://www.fantrax.com/fxpa/req?leagueId=vq6dn98pkrutq54c', data = payload, headers = headers)
-a = 1
+get_player_urls()
