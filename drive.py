@@ -39,8 +39,7 @@ def login(driver):
         WebDriverWait(driver, 10).until(
             expected_conditions.presence_of_element_located((By.XPATH, '//iframe[@title="reCAPTCHA"]'))
         )
-        print('The program needs you to prove to the browser that you are not a robot!')
-        input()
+        input('Prove to the browser that you are not a robot, and then enter any character in the terminal to confirm')
     except TimeoutException as ex:
         pass
 
