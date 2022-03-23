@@ -24,5 +24,3 @@ def get_player_urls(num_letters: int = None) -> List:
             player_url = player_template.safe_substitute(player_id = player_id, player_name = player_name)
             player_urls.append(player_url)
     return player_urls
-
-get_player_urls()
