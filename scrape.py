@@ -23,5 +23,5 @@ def get_player_url_dict(num_letters: int = None, exclude_keepers: bool = True) -
             player_id = onclick_attr[substring_start_loc:substring_end_loc]
             player_name = td.text.lower().replace(' ', '-')
             player_url = player_template.safe_substitute(player_id = player_id, player_name = player_name)
-            player_url_dict[player_name] = player_url
+            player_url_dict[td.text] = player_url
     return player_url_dict
