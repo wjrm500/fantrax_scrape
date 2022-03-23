@@ -20,19 +20,18 @@ cnx = mysql.connector.connect(
 cursor = cnx.cursor()
 
 table_name = 'fantrax.player_match'
-player_urls = scrape.get_player_urls(num_letters = 1)
-for player_url in player_urls:
+player_url_dict = scrape.get_player_url_dict(num_letters = 1)
+for player_name, player_url in player_url_dict.items():
     try:
         player_match_data = drive.get_player_match_data(driver, player_url)
     except Exception as ex:
         continue
-    keys = ['Player'] + list(map(lambda x: f'`{x}`', filter(lambda x: x, list(player_match_data.items())[0][1][0].keys())))[:20]
-    columns = ','.join(keys)
-    placeholders = ','.join(['%s'] * len(keys))
-    sql = f'INSERT INTO {table_name} ({columns}) VALUES ({placeholders})'
-
-    for player_name, matches in player_match_data.items():
-        for match in matches:
+    if player_match_data != []:
+        keys = ['`Player`'] + list(map(lambda x: f'`{x}`', list(player_match_data[0].keys())[:20]))
+        columns = ','.join(keys)
+        placeholders = ','.join(['%s'] * len(keys))
+        sql = f'INSERT INTO {table_name} ({columns}) VALUES ({placeholders})'
+        for match in player_match_data:
             try:
                 cursor.execute(sql, [player_name] + list(match.values())[:20])
                 cnx.commit()
