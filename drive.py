@@ -69,9 +69,9 @@ def scrape_data(driver):
         data.append(datum)
     return data
 
-def get_player_match_data(driver: WebDriver, player_url: str):
+def get_player_match_data(driver: WebDriver, player_url: str, init_load: bool):
     driver.get(player_url)
-    sleep(7.5)
+    sleep(7.5 if init_load else 2.5)
     while True:
         if ('login' in driver.current_url):
             login(driver)
