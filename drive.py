@@ -1,8 +1,12 @@
+from dotenv import load_dotenv
+import os
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import ElementClickInterceptedException
 
 import scrape
+
+load_dotenv()
 
 PATH = 'C:\Program Files (x86)\chromedriver.exe'
 driver = webdriver.Chrome(PATH)
@@ -25,7 +29,7 @@ def login(driver):
             username = driver.find_element(value = 'mat-input-0')
             password = driver.find_element(value = 'mat-input-1')
             username.send_keys('wjrm500@gmail.com')
-            password.send_keys('***REMOVED***')
+            password.send_keys(os.environ.get('FANTRAX_PASSWORD'))
             password.send_keys(Keys.ENTER)
             break
         except ElementClickInterceptedException:

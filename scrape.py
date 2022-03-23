@@ -1,5 +1,4 @@
 from typing import List
-from urllib.request import ProxyDigestAuthHandler
 from bs4 import BeautifulSoup
 import requests
 import string
