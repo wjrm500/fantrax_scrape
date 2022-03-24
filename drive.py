@@ -1,5 +1,6 @@
 from time import sleep
 from typing import List, Union
+from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import os
 from selenium.webdriver.chrome.webdriver import WebDriver
@@ -10,16 +11,18 @@ from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 
+from date_conversion import convert_date
+
 load_dotenv()
 
-def find_element(driver: WebDriver, by: By, identifier: Union[str, int]) -> WebElement:
-    WebDriverWait(driver, 5).until(
+def find_element(driver: WebDriver, by: By, identifier: Union[str, int], wait: int = 5) -> WebElement:
+    WebDriverWait(driver, wait).until(
         expected_conditions.presence_of_element_located((by, identifier))
     )
     return driver.find_element(by, identifier)
 
-def find_elements(driver: WebDriver, by: By, identifier: Union[str, int]) -> List[WebElement]:
-    WebDriverWait(driver, 5).until(
+def find_elements(driver: WebDriver, by: By, identifier: Union[str, int], wait: int = 5) -> List[WebElement]:
+    WebDriverWait(driver, wait).until(
         expected_conditions.presence_of_element_located((by, identifier))
     )
     return driver.find_elements(by, identifier)
@@ -53,28 +56,49 @@ def reveal_data(driver):
         except ElementClickInterceptedException:
             give_cookie_consent(driver)
 
-def scrape_data(driver):
+def scrape_data(driver: WebDriver, season: str):
     # print('Scraping data...')
-    table_elem = find_element(driver, By.CLASS_NAME, 'player-profile-table')
-    row_elems = table_elem.find_elements(By.TAG_NAME, 'tr')
-    header_row = row_elems[0]
-    column_names = [th.text for th in header_row.find_elements(By.TAG_NAME, 'th')]
+    sleep(0.5)
+    find_element(driver, By.TAG_NAME, 'player-profile-table') # Wait till element is loaded
+    html = driver.page_source
+    soup = BeautifulSoup(html, 'html.parser')
+    table = soup.find('player-profile-table')
+    rows = table.find_all('tr')
+    header_row = rows[0]
+    column_names = [th.text.lower().strip() for th in header_row.find_all('th')]
     data = []
-    for row in row_elems[2:]:
+    for row in rows[2:]:
         datum = {}
-        cells = row.find_elements(By.TAG_NAME, 'td')
+        cells = row.find_all('td')
         for i in range(len(column_names)):
             column_name = column_names[i]
-            datum[column_name] = cells[i].text
+            value = cells[i].text
+            if column_name == 'date':
+                value = convert_date(value, season)
+            datum[column_name] = value
         data.append(datum)
     return data
 
 def get_player_match_data(driver: WebDriver, player_url: str, init_load: bool):
     driver.get(player_url)
     sleep(7.5 if init_load else 2.5)
+    data = {}
     while True:
         if ('login' in driver.current_url):
             login(driver)
         else:
             reveal_data(driver)
-            return scrape_data(driver)
+            find_element(driver, By.ID, 'mat-select-value-1').click()
+            dropdown = find_element(driver, By.ID, 'mat-select-0-panel')
+            mat_options = dropdown.find_elements(By.TAG_NAME, 'mat-option')
+            num_iterations = len(mat_options)
+            for i in range(num_iterations):
+                span: WebElement = mat_options[i].find_element(By.TAG_NAME, 'span')
+                season = span.text
+                span.click()
+                season_data = scrape_data(driver, season)
+                data[season] = season_data
+                find_element(driver, By.ID, 'mat-select-value-1').click()
+                dropdown = find_element(driver, By.ID, 'mat-select-0-panel')
+                mat_options = dropdown.find_elements(By.TAG_NAME, 'mat-option')
+            return data
