@@ -53,3 +53,7 @@ for i, player in enumerate(players, 1):
         print('\n')
 cursor.close()
 cnx.close()
+
+### Past seasons
+### Upcoming fixtures
+### Minutes played
