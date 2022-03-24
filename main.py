@@ -19,7 +19,7 @@ cursor = cnx.cursor()
 
 table_name = 'fantrax.player_match'
 begin_letter, end_letter = 'B', 'Z'
-print('Retrieving all players whose surnames have first letters that fall between {begin_letter} and {end_letter} in the alphabet...')
+print(f'Retrieving all players whose surnames have first letters that fall between {begin_letter} and {end_letter} in the alphabet...')
 players = scrape.get_players(begin_letter, end_letter)
 print(f'{len(players)} players retrieved.')
 driver = webdriver.Chrome('C:\Program Files (x86)\chromedriver.exe')
