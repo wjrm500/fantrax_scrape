@@ -34,7 +34,7 @@ def get_ghost_points(match: Dict, position: str) -> float:
 
 start = time.time()
 table_name = 'fantrax.player_match_2'
-begin_letter, end_letter = 'B', 'Z'
+begin_letter, end_letter = 'A', 'Z'
 print(f'Retrieving all players whose surnames have first letters that fall between {begin_letter} and {end_letter} in the alphabet...')
 players = scrape.get_players(begin_letter, end_letter)
 print(f'{len(players)} players retrieved.')
@@ -43,13 +43,17 @@ player: Dict
 for i, player in enumerate(players, 1):
     print(f'Processing player {i}/{len(players)}: {player["name"]}')
     try:
-        print(f'{player["name"]}: retrieving data...')
         while True:
-            player_match_data = drive.get_player_match_data(driver, player['url'], i == 0)
-            if all(player_match_data.keys()):
-                break
-            print('Season text missing, retrying...')
-        print(f'{player["name"]}: data retrieved successfully.')
+            print(f'{player["name"]}: retrieving data...')
+            try:
+                player_match_data = drive.get_player_match_data(driver, player['url'], i == 0)
+                if all(player_match_data.keys()):
+                    print(f'{player["name"]}: data retrieved successfully.')
+                    break
+                print(f'{player["name"]}: data retrieved successfully, but something is missing! Retrying...')
+            except:
+                print(f'{player["name"]}: data retrieval failed, retrying...')
+                pass
         if (not any(player_match_data.values())):
             print(f'{player["name"]}: no match history, moving swiftly on...')
             continue

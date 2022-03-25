@@ -1,5 +1,5 @@
 from time import sleep
-from typing import List, Union
+from typing import Dict, List, Union
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import os
@@ -27,7 +27,8 @@ def find_elements(driver: WebDriver, by: By, identifier: Union[str, int], wait: 
 
 def give_cookie_consent(driver):
     # print('Giving cookie consent...')
-    driver.find_element_by_xpath("//*[contains(text(), 'AGREE')]").click()
+    accept_cookies_elem = find_element(By.XPATH, "//*[contains(text(), 'AGREE')]")
+    accept_cookies_elem.click()
 
 def login(driver):
     # print('Logging in...')
@@ -44,35 +45,48 @@ def login(driver):
     except TimeoutException as ex:
         pass
 
-def reveal_data(driver):
-    # print('Revealing data...')
-    games_fntsy_elem = list(filter(lambda x: x.text == 'Games (Fntsy)', find_elements(driver, By.CLASS_NAME, 'tabs__item')))[0]
+def open_panel(driver: WebDriver, panel_text: str) -> None:
+    # print(f'Opening panel {panel_text}...')
+    open_panel_elem = list(filter(lambda x: x.text == panel_text, find_elements(driver, By.CLASS_NAME, 'tabs__item')))[0]
     while True:
         try:
-            games_fntsy_elem.click()
+            open_panel_elem.click()
             break
         except ElementClickInterceptedException:
             give_cookie_consent(driver)
 
-def scrape_data(driver: WebDriver, season: str):
+def scrape_data(driver: WebDriver, num_seasons: int = None) -> Dict:
     # print('Scraping data...')
-    sleep(0.5)
-    find_element(driver, By.TAG_NAME, 'player-profile-table') # Wait till element is loaded
-    html = driver.page_source
-    soup = BeautifulSoup(html, 'html.parser')
-    table = soup.find('player-profile-table')
-    rows = table.find_all('tr')
-    header_row = rows[0]
-    column_names = [th.text.lower().strip() for th in header_row.find_all('th')]
-    data = []
-    for row in rows[2:]:
-        datum = {}
-        cells = row.find_all('td')
-        for i in range(len(column_names)):
-            column_name = column_names[i]
-            value = cells[i].text
-            datum[column_name] = value
-        data.append(datum)
+    find_element(driver, By.TAG_NAME, 'mat-select').click()
+    dropdown = find_element(driver, By.CLASS_NAME, 'mat-select-panel')
+    mat_options = dropdown.find_elements(By.TAG_NAME, 'mat-option')
+    num_iterations = num_seasons or len(mat_options)
+    data = {}
+    for i in range(num_iterations):
+        span: WebElement = mat_options[i].find_element(By.TAG_NAME, 'span')
+        season = span.text
+        span.click()
+        sleep(0.5)
+        find_element(driver, By.TAG_NAME, 'player-profile-table') # Wait till element is loaded
+        html = driver.page_source
+        soup = BeautifulSoup(html, 'html.parser')
+        table = soup.find('player-profile-table')
+        rows = table.find_all('tr')
+        header_row = rows[0]
+        column_names = [th.text.lower().strip() for th in header_row.find_all('th')]
+        data[season] = []
+        for row in rows[2:]:
+            datum = {}
+            cells = row.find_all('td')
+            for j in range(len(column_names)):
+                column_name = column_names[j]
+                value = cells[j].text
+                datum[column_name] = value
+            data[season].append(datum)
+        if i != num_iterations - 1:
+            find_element(driver, By.TAG_NAME, 'mat-select').click()
+            dropdown = find_element(driver, By.CLASS_NAME, 'mat-select-panel')
+            mat_options = dropdown.find_elements(By.TAG_NAME, 'mat-option')
     return data
 
 def get_player_match_data(driver: WebDriver, player_url: str, init_load: bool):
@@ -83,18 +97,16 @@ def get_player_match_data(driver: WebDriver, player_url: str, init_load: bool):
         if ('login' in driver.current_url):
             login(driver)
         else:
-            reveal_data(driver)
-            find_element(driver, By.ID, 'mat-select-value-1').click()
-            dropdown = find_element(driver, By.ID, 'mat-select-0-panel')
-            mat_options = dropdown.find_elements(By.TAG_NAME, 'mat-option')
-            num_iterations = len(mat_options)
-            for i in range(num_iterations):
-                span: WebElement = mat_options[i].find_element(By.TAG_NAME, 'span')
-                season = span.text
-                span.click()
-                season_data = scrape_data(driver, season)
-                data[season] = season_data
-                find_element(driver, By.ID, 'mat-select-value-1').click()
-                dropdown = find_element(driver, By.ID, 'mat-select-0-panel')
-                mat_options = dropdown.find_elements(By.TAG_NAME, 'mat-option')
-            return data
+            open_panel(driver, panel_text = 'Games (Fntsy)')
+            gf_data = scrape_data(driver)
+            open_panel(driver, panel_text = 'Games')
+            try:
+                num_seasons = max([index for index, item in enumerate(gf_data.values()) if item != []]) + 1
+            except:
+                return gf_data
+            g_data = scrape_data(driver, num_seasons)
+            for season, data in gf_data.items():
+                for i, datum in enumerate(data):
+                    datum['min'] = g_data[season][i]['min']
+                    datum['s'] = g_data[season][i]['s']
+            return gf_data
