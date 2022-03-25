@@ -44,7 +44,11 @@ for i, player in enumerate(players, 1):
     print(f'Processing player {i}/{len(players)}: {player["name"]}')
     try:
         print(f'{player["name"]}: retrieving data...')
-        player_match_data = drive.get_player_match_data(driver, player['url'], i == 0)
+        while True:
+            player_match_data = drive.get_player_match_data(driver, player['url'], i == 0)
+            if all(player_match_data.keys()):
+                break
+            print('Season text missing, retrying...')
         print(f'{player["name"]}: data retrieved successfully.')
         if (not any(player_match_data.values())):
             print(f'{player["name"]}: no match history, moving swiftly on...')
@@ -62,7 +66,6 @@ for i, player in enumerate(players, 1):
                 try:
                     match['date'] = convert_date(match['date'], season)
                     match['team'] = match['team'][:3]
-                    match['opp'] = match['opp'][:3]
                     where = 'A' if match['opp'].startswith('@') else 'H'
                     match['opp'] = match['opp'][-3:]
                     ghost_fpts = get_ghost_points(match, player['position'])
