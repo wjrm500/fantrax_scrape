@@ -5,13 +5,11 @@ from dotenv import load_dotenv
 import os
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.common.keys import Keys
-from selenium.common.exceptions import ElementClickInterceptedException, NoSuchElementException, TimeoutException
+from selenium.common.exceptions import ElementClickInterceptedException, TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
-
-from date_conversion import convert_date
 
 load_dotenv()
 
@@ -73,8 +71,6 @@ def scrape_data(driver: WebDriver, season: str):
         for i in range(len(column_names)):
             column_name = column_names[i]
             value = cells[i].text
-            if column_name == 'date':
-                value = convert_date(value, season)
             datum[column_name] = value
         data.append(datum)
     return data

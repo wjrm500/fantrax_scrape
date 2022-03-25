@@ -4,6 +4,7 @@ import os
 from selenium import webdriver
 import time
 from typing import Dict
+from date_conversion import convert_date
 
 import drive
 import scrape
@@ -18,9 +19,22 @@ cnx = mysql.connector.connect(
 )
 cursor = cnx.cursor()
 
+create_table_sql_file = open('create_table.sql', 'r')
+create_table_sql = create_table_sql_file.read()
+for statement in create_table_sql.split(';'):
+    cursor.execute(statement)
+    cnx.commit()
+
+def get_ghost_points(match: Dict, position: str) -> float:
+    fpts = float(match['fpts'])
+    g_pts = int(match['g']) * (10 if position == 'D' else 9)
+    at_pts = int(match['at']) * (8 if position == 'D' else 6)
+    cs_pts = int(match['cs']) * (6 if position == 'D' else (1 if position == 'M' else 0))
+    return fpts - g_pts - at_pts - cs_pts
+
 start = time.time()
 table_name = 'fantrax.player_match_2'
-begin_letter, end_letter = 'A', 'Z'
+begin_letter, end_letter = 'B', 'Z'
 print(f'Retrieving all players whose surnames have first letters that fall between {begin_letter} and {end_letter} in the alphabet...')
 players = scrape.get_players(begin_letter, end_letter)
 print(f'{len(players)} players retrieved.')
@@ -39,14 +53,21 @@ for i, player in enumerate(players, 1):
         for season, match_data in player_match_data.items():
             if match_data == []:
                 continue
-            keys = ['`Season`', '`Player`', '`Position`'] + list(map(lambda x: f'`{x}`', list(match_data[0].keys())[:20]))
+            keys = list(map(lambda x: f'`{x}`', ['season', 'player', 'position', 'ghost_fpts', 'where'] + list(match_data[0].keys())))
             columns = ','.join(keys)
             placeholders = ','.join(['%s'] * len(keys))
             sql = f'INSERT INTO {table_name} ({columns}) VALUES ({placeholders})'
             i = 0
             for match in match_data:
                 try:
-                    cursor.execute(sql, [season, player['name'], player['position']] + list(match.values())[:20])
+                    match['date'] = convert_date(match['date'], season)
+                    match['team'] = match['team'][:3]
+                    match['opp'] = match['opp'][:3]
+                    where = 'A' if match['opp'].startswith('@') else 'H'
+                    match['opp'] = match['opp'][-3:]
+                    ghost_fpts = get_ghost_points(match, player['position'])
+                    values = [season, player['name'], player['position'], ghost_fpts, where] + list(match.values())
+                    cursor.execute(sql, values)
                     cnx.commit()
                     i += 1
                 except Exception as ex:
