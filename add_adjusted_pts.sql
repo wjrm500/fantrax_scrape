@@ -1,7 +1,16 @@
 /* Get average points and ghost points across all matches */
 
-SELECT AVG(`fpts`), AVG(`ghost_fpts`) INTO @avg_fpts, @avg_ghost_fpts
-FROM fantrax.player_match_2;
+DROP TEMPORARY TABLE IF EXISTS temp;
+
+CREATE TEMPORARY TABLE temp AS
+	SELECT `season`
+		  , AVG(`fpts`) AS `avg_fpts`
+		  , AVG(`ghost_fpts`) AS `avg_ghost_fpts`
+	FROM fantrax.player_match
+	GROUP BY `season`;
+
+ALTER TABLE temp
+	ADD INDEX season_idx(`season`);
 
 /*
 Get average points and ghost points by "situation"
@@ -22,9 +31,9 @@ Why multiple subqueries?
 	having at least 50 data points), to avoid having to use outlandish data to adjust with.
 */
 
-DROP TEMPORARY TABLE IF EXISTS temp;
+DROP TEMPORARY TABLE IF EXISTS temp2;
 
-CREATE TEMPORARY TABLE temp AS
+CREATE TEMPORARY TABLE temp2 AS
 	SELECT sq1.`season`
 		, sq1.`opp`
 		, sq1.`where`
@@ -52,7 +61,7 @@ CREATE TEMPORARY TABLE temp AS
 				, AVG(`fpts`) AS `group_avg_fpts`
 				, AVG(`ghost_fpts`) AS `group_avg_ghost_fpts`
 				, COUNT(*) AS `count`
-			FROM fantrax.player_match_2
+			FROM fantrax.player_match
 			GROUP BY `season`, `opp`, `where`, `position`
 			) AS sq1
 		JOIN (
@@ -62,7 +71,7 @@ CREATE TEMPORARY TABLE temp AS
 				, AVG(`fpts`) AS `group_avg_fpts`
 				, AVG(`ghost_fpts`) AS `group_avg_ghost_fpts`
 				, COUNT(*) AS `count`
-			FROM fantrax.player_match_2
+			FROM fantrax.player_match
 			GROUP BY `season`, `opp`, `position`
 			) AS sq2
 			ON sq1.`season` = sq2.`season`
@@ -74,7 +83,7 @@ CREATE TEMPORARY TABLE temp AS
 				, AVG(`fpts`) AS `group_avg_fpts`
 				, AVG(`ghost_fpts`) AS `group_avg_ghost_fpts`
 				, COUNT(*) AS `count`
-			FROM fantrax.player_match_2
+			FROM fantrax.player_match
 			GROUP BY `season`, `opp`
 			) AS sq3
 			ON sq1.`season` = sq3.`season`
@@ -84,67 +93,30 @@ CREATE TEMPORARY TABLE temp AS
 				, AVG(`fpts`) AS `group_avg_fpts`
 				, AVG(`ghost_fpts`) AS `group_avg_ghost_fpts`
 				, COUNT(*) AS `count`
-			FROM fantrax.player_match_2
+			FROM fantrax.player_match
 			GROUP BY `opp`
 			) AS sq4
 			ON sq1.`opp` = sq4.`opp`;
+		
+ALTER TABLE temp2
+	ADD INDEX season_idx(`season`),
+	ADD INDEX opp_idx(`opp`),
+	ADD INDEX where_idx(`where`),
+	ADD INDEX position_idx(`position`);
 
 /* Add columns with adjusted data */
 
-ALTER TABLE fantrax.player_match_2
+/*ALTER TABLE fantrax.player_match
 	ADD adjusted_fpts FLOAT AFTER ghost_fpts,
-	ADD adjusted_ghost_fpts FLOAT AFTER adjusted_fpts;
+	ADD adjusted_ghost_fpts FLOAT AFTER adjusted_fpts;*/
 
-UPDATE fantrax.player_match_2 AS pm
+UPDATE fantrax.player_match AS pm
 	JOIN temp AS t
 		ON pm.`season` = t.`season`
-			AND pm.`opp` = t.`opp`
-			AND pm.`where` = t.`where`
-			AND pm.`position` = t.`position`
-SET adjusted_fpts = ROUND(pm.`fpts` - t.`group_avg_fpts` + @avg_fpts, 2),
-	adjusted_ghost_fpts = ROUND(pm.`ghost_fpts` - t.`group_avg_ghost_fpts` + @avg_ghost_fpts, 2);
-
-/*
-Adjust adjusted points to counteract temporal effects of adjusting points
-
-Why?
-	I noticed that adjusting the points led to a downwards adjustment in historic seasons and an upwards adjustment in more
-	recent seasons. I wanted to counteract this effect.
-*/
-
-DROP TEMPORARY TABLE IF EXISTS temp;
-
-CREATE TEMPORARY TABLE temp AS
-	SELECT @num := @num + 1 AS `rank`
-		  , sq.*
-	FROM (
-			SELECT YEAR(`date`) AS `year`
-				  , MONTH(`date`) AS `month`
-				  , AVG(adjusted_fpts - fpts) AS avg_adjustment
-			FROM fantrax.player_match_2
-			GROUP BY YEAR(`date`), MONTH(`date`)
-			ORDER BY YEAR(`date`), MONTH(`date`)
-			) AS sq
-	JOIN (SELECT @num := 0) AS dummy;
-
-DROP TEMPORARY TABLE IF EXISTS temp2;
-
-CREATE TEMPORARY TABLE temp2 AS SELECT * FROM temp;
-
-DROP TEMPORARY TABLE IF EXISTS temp3;
-
-CREATE TEMPORARY TABLE temp3 AS
-	SELECT t.*
-		  , AVG(t2.avg_adjustment) AS avg_avg_adjustment
-	FROM temp AS t
-		JOIN temp2 AS t2
-			ON t2.`rank` BETWEEN t.`rank` - 4 AND t.`rank`
-	GROUP BY t.`rank`
-	ORDER BY t.`rank`;
-
-UPDATE fantrax.player_match_2 AS pm
-	JOIN temp3 AS t
-		ON YEAR(pm.`date`) = t.`year`
-			AND MONTH(pm.`date`) = t.`month`
-SET adjusted_fpts = ROUND(pm.`adjusted_fpts` - t.avg_avg_adjustment, 2),
-	adjusted_ghost_fpts = ROUND(pm.`adjusted_ghost_fpts` - t.avg_avg_adjustment, 2);
+	JOIN temp2 AS t2
+		ON pm.`season` = t2.`season`
+			AND pm.`opp` = t2.`opp`
+			AND pm.`where` = t2.`where`
+			AND pm.`position` = t2.`position`
+SET adjusted_fpts = ROUND(pm.`fpts` - t2.`group_avg_fpts` + t.`avg_fpts`, 2),
+	adjusted_ghost_fpts = ROUND(pm.`ghost_fpts` - t2.`group_avg_ghost_fpts` + t.`avg_ghost_fpts`, 2);
