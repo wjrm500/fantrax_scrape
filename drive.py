@@ -89,7 +89,7 @@ def scrape_data(driver: WebDriver, num_seasons: int = None) -> Dict:
             mat_options = dropdown.find_elements(By.TAG_NAME, 'mat-option')
     return data
 
-def get_player_match_data(driver: WebDriver, player_url: str, init_load: bool):
+def get_player_match_data(driver: WebDriver, player_url: str, init_load: bool, num_seasons: int):
     driver.get(player_url)
     sleep(7.5 if init_load else 2.5)
     data = {}
@@ -98,7 +98,7 @@ def get_player_match_data(driver: WebDriver, player_url: str, init_load: bool):
             login(driver)
         else:
             open_panel(driver, panel_text = 'Games (Fntsy)')
-            gf_data = scrape_data(driver)
+            gf_data = scrape_data(driver, num_seasons)
             open_panel(driver, panel_text = 'Games')
             try:
                 num_seasons = max([index for index, item in enumerate(gf_data.values()) if item != []]) + 1

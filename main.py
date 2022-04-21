@@ -9,6 +9,10 @@ from date_conversion import convert_date
 import drive
 import scrape
 
+DATA_MODE_FULL = 'FULL'
+DATA_MODE_PARTIAL = 'PARTIAL'
+DATA_MODE = DATA_MODE_PARTIAL # Can be FULL or PARTIAL - use PARTIAL to only update current season data
+
 load_dotenv()
 
 cnx = mysql.connector.connect(
@@ -19,9 +23,10 @@ cnx = mysql.connector.connect(
 )
 cursor = cnx.cursor()
 
-create_table_sql_file = open('create_table.sql', 'r')
-create_table_sql = create_table_sql_file.read()
-for statement in create_table_sql.split(';'):
+sql_file_name = 'drop_and_create_table.sql' if DATA_MODE == DATA_MODE_FULL else 'delete_latest_season.sql'
+sql_file = open(sql_file_name, 'r')
+sql = sql_file.read()
+for statement in sql.split(';'):
     cursor.execute(statement)
     cnx.commit()
 
@@ -33,7 +38,7 @@ def get_ghost_points(match: Dict, position: str) -> float:
     return fpts - g_pts - at_pts - cs_pts
 
 start = time.time()
-table_name = 'fantrax.player_match_2'
+table_name = 'fantrax.player_match'
 begin_letter, end_letter = 'A', 'Z'
 print(f'Retrieving all players whose surnames have first letters that fall between {begin_letter} and {end_letter} in the alphabet...')
 players = scrape.get_players(begin_letter, end_letter)
@@ -46,7 +51,8 @@ for i, player in enumerate(players, 1):
         while True:
             print(f'{player["name"]}: retrieving data...')
             try:
-                player_match_data = drive.get_player_match_data(driver, player['url'], i == 0)
+                num_seasons = 1 if DATA_MODE == DATA_MODE_PARTIAL else None
+                player_match_data = drive.get_player_match_data(driver, player['url'], i == 0, num_seasons)
                 if all(player_match_data.keys()):
                     print(f'{player["name"]}: data retrieved successfully.')
                     break
@@ -54,7 +60,7 @@ for i, player in enumerate(players, 1):
             except:
                 print(f'{player["name"]}: data retrieval failed, retrying...')
                 pass
-        if (not any(player_match_data.values())):
+        if not any(player_match_data.values()):
             print(f'{player["name"]}: no match history, moving swiftly on...')
             continue
         print(f'{player["name"]}: persisting to database...')
