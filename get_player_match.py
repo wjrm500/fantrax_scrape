@@ -95,6 +95,3 @@ cnx.close()
 
 end = time.time()
 print(f'Process complete. {end - start} seconds elapsed.')
-### Past seasons
-### Upcoming fixtures
-### Minutes played
